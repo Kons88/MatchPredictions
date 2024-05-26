@@ -1,0 +1,76 @@
+# Load required libraries
+library(e1071)
+library(nnet)
+library(rvest)
+library(dplyr)
+library(caret)
+library(randomForest)
+
+# Specify the URL
+url <- "https://www.tostoixima.gr/live/soccer/2024-05-12"
+
+# Read the HTML content from the URL
+page <- read_html(url)
+
+# Extract the table(s) using CSS selectors
+tables <- page %>% html_nodes("table")
+
+# If there are multiple tables, you might need to specify which one you want
+# For example, tables[[1]] for the first table
+
+# Convert the table to a data frame
+data <- tables %>% html_table()
+
+mydat <- as.data.frame(data[[1]][,c(3,4,6,8,12)])
+
+# Convert first four columns to numeric
+mydat[, 1:4] <- apply(mydat[, 1:4], 2, as.numeric)
+
+# Identify rows with non-numeric values in the first four columns
+non_numeric_rows <- apply(mydat[, 1:4], 1, function(x) any(is.na(x)))
+
+# Subset dataframe to keep only rows with all numeric values in the first four columns
+df_clean <- mydat[!non_numeric_rows, ]
+
+# Change Column names
+colnames(df_clean) <- c("Code", "Home", "Draw", "Away", "Result")
+colnames(all_data) <- c("Code", "Home", "Draw", "Away", "Result")
+df_clean$Result <- NULL
+
+stacking <- function(df_train, df_test) {
+    # Train base models
+    nb_model <- naiveBayes(as.factor(Result) ~ ., data = df_train)
+    nn_model <- nnet::multinom(Result ~ ., data = df_train, MaxNWts = 10000)
+    rf_model <- randomForest(factor(Result) ~ ., data = df_train)
+    svm_model <- svm(factor(Result) ~ ., data = df_train, kernel = "radial")
+    
+    # Predictions from base models
+    nb_pred <- predict(nb_model, newdata = df_test, type = "class")
+    nn_pred <- predict(nn_model, newdata = df_test, type = "class")
+    rf_pred <- predict(rf_model, newdata = df_test, type = "class")
+    svm_pred <- predict(svm_model, newdata = df_test, type = "class")
+    
+    # Combine predictions into a new dataframe
+    stacked_data <- data.frame(nb = nb_pred,
+                               nn = nn_pred,
+                               rf = rf_pred,
+                               svm = svm_pred)
+    
+    # Train a meta-learner model (multinomial logistic regression)
+    meta_model <- naiveBayes(nb ~ nn + rf + svm, data = stacked_data)
+    
+    # Predictions from the meta-learner
+    meta_pred <- predict(meta_model, newdata = stacked_data, type = "class")
+    
+    # Add final predictions to the test_data dataframe
+    df_test$Predicted_Result <- meta_pred
+    
+    return(df_test)
+}
+
+# Apply stacking function to your cleaned dataframe
+stacked_results <- data.frame(Code=df_clean[,1], stacking(all_data[,-1], df_clean[,-1]))
+
+# Filter for draw (X) results
+draw_results <- stacked_results[stacked_results$Predicted_Result == "X", ]
+print(draw_results)

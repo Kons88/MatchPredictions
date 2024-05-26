@@ -1,0 +1,47 @@
+# Load required libraries
+library(rvest)
+library(dplyr)
+library(e1071)  # Required for Naive Bayes
+
+# Specify the URL
+url <- "https://www.tostoixima.gr/live/soccer/2024-05-11"
+
+# Read the HTML content from the URL
+page <- read_html(url)
+
+# Extract the table(s) using CSS selectors
+tables <- page %>% html_nodes("table")
+
+# If there are multiple tables, you might need to specify which one you want
+# For example, tables[[1]] for the first table
+
+# Convert the table to a data frame
+data <- tables %>% html_table()
+
+mydat <- as.data.frame(data[[1]][,c(3,4,6,8,12)])
+
+# Convert first four columns to numeric
+mydat[, 1:4] <- apply(mydat[, 1:4], 2, as.numeric)
+
+# Identify rows with non-numeric values in the first four columns
+non_numeric_rows <- apply(mydat[, 1:4], 1, function(x) any(is.na(x)))
+
+# Subset dataframe to keep only rows with all numeric values in the first four columns
+df_clean <- mydat[!non_numeric_rows, ]
+
+# Change Column names
+colnames(df_clean) <- c("Code", "1", "X", "2", "Result")
+df_clean$Result <- NULL
+
+# Fitting the Naive Bayes model
+nb_model <- naiveBayes(as.factor(Result) ~ ., data = all_data)
+
+# Predicting results for tomorrow's games
+predicted_results <- predict(nb_model, newdata = df_clean, type = "class")
+
+# Adding predicted results to the dataframe
+df_clean$Result <- predicted_results
+
+# Filtering for draw (X) results
+draw_results <- df_clean[df_clean$Result == "X", ]
+print(draw_results)

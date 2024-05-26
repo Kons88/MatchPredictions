@@ -1,0 +1,44 @@
+library(rvest)
+library(dplyr)
+library(lubridate)
+
+# Function to extract data from a given date URL
+extract_data <- function(url) {
+  page <- read_html(url)
+  tables <- page %>% html_nodes("table")
+  data <- tables %>% html_table()
+  mydat <- as.data.frame(data[[1]][,c(3,4,6,8,12)])
+  mydat[, 1:4] <- apply(mydat[, 1:4], 2, as.numeric)
+  non_numeric_rows <- apply(mydat[, 1:4], 1, function(x) any(is.na(x)))
+  df_clean <- mydat[!non_numeric_rows, ]
+  colnames(df_clean) <- c("Code", "1", "X", "2", "Result")
+  return(df_clean)
+}
+
+# Function to generate URLs for the previous 10 days
+generate_urls <- function(base_url, days) {
+  dates <- seq(Sys.Date() - days, Sys.Date() - 1, by = "day")
+  urls <- paste0(base_url, "/", format(dates, "%Y-%m-%d"))
+  return(urls)
+}
+
+# Base URL
+base_url <- "https://www.tostoixima.gr/live/soccer"
+
+# Generate URLs for the previous 100 days
+urls <- generate_urls(base_url, 100)
+
+# Initialize an empty dataframe to store all the data
+all_data <- data.frame()
+
+# Extract data from each URL and combine into a single dataframe
+for (url in urls) {
+  data <- extract_data(url)
+  all_data <- bind_rows(all_data, data)
+}
+
+# Remove rows where the value is '-'
+all_data <- all_data %>% filter(Result != '-')
+
+# Result
+print(all_data)
