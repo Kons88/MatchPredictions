@@ -30,7 +30,7 @@ non_numeric_rows <- apply(mydat[, 1:4], 1, function(x) any(is.na(x)))
 df_clean <- mydat[!non_numeric_rows, ]
 
 # Change Column names
-colnames(df_clean) <- c("Code", "1", "X", "2", "Result")
+colnames(df_clean) <- c("Code", "Win", "Draw", "Lose", "Result")
 df_clean$Result <- NULL
 
 all_data$Result <- as.factor(all_data$Result)

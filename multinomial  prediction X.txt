@@ -31,7 +31,7 @@ df_clean <- mydat[!non_numeric_rows, ]
 print(df_clean)
 
 # Change Column names
-colnames(df_clean) <- c("Code", "Home", "Draw", "Away", "Result")
+colnames(df_clean) <- c("Code", "Win", "Draw", "Lose", "Result")
 df_clean$Result <- NULL
 
 # Fitting the multinomial logistic regression model
